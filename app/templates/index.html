@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if error %}
+<div class="error">{{ error }}</div>
+{% endif %}
+
+<form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+    <label for="file" class="drop-zone" id="drop-zone">
+        <span class="drop-zone__prompt">Drop an image here or click to upload</span>
+        <span class="drop-zone__filename" id="filename-display"></span>
+        <input type="file" name="file" id="file" accept="image/*" required>
+    </label>
+    <button type="submit" id="submit-btn">Extract Tables</button>
+</form>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file');
+const filenameDisplay = document.getElementById('filename-display');
+const submitBtn = document.getElementById('submit-btn');
+
+fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) {
+        filenameDisplay.textContent = fileInput.files[0].name;
+        dropZone.classList.add('has-file');
+    }
+});
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('drag-over');
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        filenameDisplay.textContent = e.dataTransfer.files[0].name;
+        dropZone.classList.add('has-file');
+    }
+});
+
+document.querySelector('.upload-form').addEventListener('submit', () => {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing...';
+});
+</script>
+{% endblock %}

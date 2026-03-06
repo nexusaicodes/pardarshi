@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="result-header">
+    <h2>Results for {{ filename }}</h2>
+    <a href="/" class="btn">Upload another image</a>
+</div>
+
+<section class="result-section">
+    <h3>Annotated Image</h3>
+    <p class="legend">
+        <span class="legend-item" style="color: blue;">Rows</span>
+        <span class="legend-item" style="color: red;">Columns</span>
+        <span class="legend-item" style="color: green;">Cells</span>
+    </p>
+    <div class="image-container">
+        <img src="{{ annotated_image }}" alt="Annotated table extraction result">
+    </div>
+</section>
+
+{% for tbl in tables_data %}
+<section class="result-section">
+    <h3>Table {{ loop.index }}</h3>
+    {% if tbl.rows %}
+    <div class="table-container">
+        <table class="extracted-table">
+            {% for row in tbl.rows %}
+            <tr{% if row.is_header %} class="header-row"{% endif %}>
+                {% for cell in row.cells %}
+                {% if row.is_header %}
+                <th>{{ cell }}</th>
+                {% else %}
+                <td>{{ cell }}</td>
+                {% endif %}
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <p class="no-text">No table data extracted.</p>
+    {% endif %}
+</section>
+{% else %}
+<section class="result-section">
+    <p class="no-text">No tables were detected in this image.</p>
+</section>
+{% endfor %}
+{% endblock %}
