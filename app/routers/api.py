@@ -17,7 +17,7 @@ def api_extract(file: UploadFile = File(...), pipeline=Depends(get_pipeline)):
 
     image_bytes = file.file.read()
     if len(image_bytes) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "File too large (max 20 MB)")
+        raise HTTPException(413, "File too large (max 1 MB)")
 
     try:
         result = extract_tables(pipeline, image_bytes, ocr=OCR_ENABLED)

@@ -37,7 +37,7 @@ def upload(
     if len(image_bytes) > MAX_UPLOAD_BYTES:
         return templates.TemplateResponse("index.html", {
             "request": request,
-            "error": "File too large (max 20 MB).",
+            "error": "File too large (max 1 MB).",
         })
 
     try:
