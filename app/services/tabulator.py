@@ -1,4 +1,7 @@
+import re
 from collections import defaultdict
+
+_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def _bbox_overlap(a, b):
@@ -37,7 +40,7 @@ def build_table_rows(table: dict) -> list[dict]:
     cell_texts = defaultdict(list)  # (row_id, col_id) -> list of (x1, text)
     for tl in text_lines:
         tl_bbox = tl.get("bbox")
-        tl_text = tl.get("text", "").strip()
+        tl_text = _TAG_RE.sub("", tl.get("text", "")).strip()
         if not tl_bbox or not tl_text:
             continue
 
@@ -81,7 +84,85 @@ def build_table_rows(table: dict) -> list[dict]:
             "cells": cell_values,
         })
 
-    return {
+    return validate_table({
         "col_ids": col_ids,
         "rows": rows,
-    }
+    })
+
+
+EXPECTED_HEADERS = ["Instrument", "Qty.", "Avg. cost", "LTP"]
+_NUM_RE = re.compile(r"[^\d.]")
+
+
+def _parse_number(text: str) -> str:
+    """Strip non-numeric chars (except dot) and return cleaned number string."""
+    cleaned = _NUM_RE.sub("", text)
+    # Handle multiple dots — keep only the last one as decimal
+    parts = cleaned.split(".")
+    if len(parts) > 2:
+        cleaned = "".join(parts[:-1]) + "." + parts[-1]
+    return cleaned
+
+
+def validate_table(table_data: dict) -> dict:
+    """Validate and normalize table to expected 4-column schema.
+
+    Expected: Instrument (text) | Qty. (number) | Avg. cost (decimal) | LTP (decimal)
+
+    Returns the table_data with added "errors" list and "valid" bool.
+    Rows that don't conform are flagged but kept.
+    """
+    errors = []
+    rows = table_data.get("rows", [])
+
+    # Check column count
+    if table_data["col_ids"] and len(table_data["col_ids"]) != 4:
+        errors.append(f"Expected 4 columns, got {len(table_data['col_ids'])}")
+
+    validated_rows = []
+    for row in rows:
+        cells = row["cells"]
+
+        # Skip header rows from validation but normalize their text
+        if row["is_header"]:
+            validated_rows.append(row)
+            continue
+
+        # Must have exactly 4 cells
+        if len(cells) != 4:
+            row["row_errors"] = [f"Expected 4 cells, got {len(cells)}"]
+            validated_rows.append(row)
+            continue
+
+        row_errors = []
+
+        # Col 0: Instrument — should be non-empty text
+        instrument = cells[0].strip()
+        if not instrument:
+            row_errors.append("Instrument is empty")
+        cells[0] = instrument
+
+        # Cols 1-3: numeric values
+        for i, col_name in enumerate(["Qty.", "Avg. cost", "LTP"], start=1):
+            raw = cells[i].strip()
+            parsed = _parse_number(raw)
+            if not parsed:
+                row_errors.append(f"{col_name}: '{raw}' is not a valid number")
+            else:
+                try:
+                    cells[i] = parsed
+                except ValueError:
+                    row_errors.append(f"{col_name}: '{raw}' could not be parsed")
+
+        row["cells"] = cells
+        if row_errors:
+            row["row_errors"] = row_errors
+        validated_rows.append(row)
+
+    table_data["rows"] = validated_rows
+    table_data["headers"] = EXPECTED_HEADERS
+    table_data["errors"] = errors
+    table_data["valid"] = len(errors) == 0 and all(
+        "row_errors" not in r for r in validated_rows if not r["is_header"]
+    )
+    return table_data

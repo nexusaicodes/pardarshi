@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse
 
 from app.config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, OCR_ENABLED
 from app.dependencies import get_pipeline
-from app.services.annotator import annotate_image
 from app.services.extractor import extract_tables
 from app.services.tabulator import build_table_rows
 
@@ -40,7 +39,6 @@ def upload(request: Request, file: UploadFile = File(...), pipeline=Depends(get_
 
     try:
         result = extract_tables(pipeline, image_bytes, ocr=OCR_ENABLED)
-        annotated = annotate_image(image_bytes, result)
     except Exception as e:
         return templates.TemplateResponse("index.html", {
             "request": request,
@@ -55,6 +53,5 @@ def upload(request: Request, file: UploadFile = File(...), pipeline=Depends(get_
     return templates.TemplateResponse("result.html", {
         "request": request,
         "filename": file.filename,
-        "annotated_image": annotated,
         "tables_data": tables_data,
     })

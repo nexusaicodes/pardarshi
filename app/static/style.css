@@ -196,3 +196,36 @@ button[type="submit"]:disabled {
     color: #999;
     font-style: italic;
 }
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.badge.valid {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge.invalid {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.error-row td {
+    background: #fff3f3 !important;
+    border-left: 3px solid #dc3545;
+}
+
+.error-detail-row td {
+    background: #fff8f8 !important;
+    color: #c00;
+    font-size: 0.8rem;
+    font-style: italic;
+    padding: 0.3rem 0.75rem;
+    border-top: none;
+}
