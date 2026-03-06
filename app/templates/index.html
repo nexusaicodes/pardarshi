@@ -11,6 +11,10 @@
         <span class="drop-zone__filename" id="filename-display"></span>
         <input type="file" name="file" id="file" accept="image/*" required>
     </label>
+    <div class="cash-input">
+        <label for="cash">Cash Available</label>
+        <input type="number" name="cash" id="cash" step="0.01" min="0" placeholder="0.00" required>
+    </div>
     <button type="submit" id="submit-btn">Extract Tables</button>
 </form>
 

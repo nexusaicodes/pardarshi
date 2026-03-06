@@ -229,3 +229,51 @@ button[type="submit"]:disabled {
     padding: 0.3rem 0.75rem;
     border-top: none;
 }
+
+/* Cash input */
+.cash-input {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    width: 100%;
+    max-width: 500px;
+}
+
+.cash-input label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.cash-input input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.cash-input input:focus {
+    outline: none;
+    border-color: #4361ee;
+    box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.15);
+}
+
+/* Portfolio */
+.portfolio-total {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.extracted-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.cash-row {
+    border-top: 2px solid #1a1a2e;
+    font-weight: 600;
+}

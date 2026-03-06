@@ -91,6 +91,7 @@ def build_table_rows(table: dict) -> list[dict]:
 
 
 EXPECTED_HEADERS = ["Instrument", "Qty.", "Avg. cost", "LTP"]
+PORTFOLIO_HEADERS = ["Instrument", "Current Value", "% of Portfolio"]
 _NUM_RE = re.compile(r"[^\d.]")
 
 
@@ -166,3 +167,47 @@ def validate_table(table_data: dict) -> dict:
         "row_errors" not in r for r in validated_rows if not r["is_header"]
     )
     return table_data
+
+
+def compute_portfolio(table_data: dict, cash: float) -> dict:
+    """Compute portfolio summary from a validated table and cash amount.
+
+    For each instrument: current_value = Qty * LTP
+    portfolio_value = sum(current_values) + cash
+    Each row gets a % of portfolio_value.
+    """
+    rows = []
+    total_instrument_value = 0.0
+
+    for row in table_data["rows"]:
+        if row["is_header"]:
+            continue
+        cells = row["cells"]
+        instrument = cells[0]
+        qty = float(cells[1])
+        ltp = float(cells[3])
+        current_value = round(qty * ltp, 2)
+        total_instrument_value += current_value
+        rows.append({"instrument": instrument, "current_value": current_value})
+
+    portfolio_value = total_instrument_value + cash
+
+    # Compute percentages
+    portfolio_rows = []
+    for r in rows:
+        pct = round((r["current_value"] / portfolio_value) * 100, 2) if portfolio_value else 0.0
+        portfolio_rows.append([
+            r["instrument"],
+            f"{r['current_value']:,.2f}",
+            f"{pct:.2f}%",
+        ])
+
+    # Append cash row
+    cash_pct = round((cash / portfolio_value) * 100, 2) if portfolio_value else 0.0
+    portfolio_rows.append(["Cash", f"{cash:,.2f}", f"{cash_pct:.2f}%"])
+
+    return {
+        "headers": PORTFOLIO_HEADERS,
+        "rows": portfolio_rows,
+        "portfolio_value": f"{portfolio_value:,.2f}",
+    }

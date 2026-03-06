@@ -6,37 +6,34 @@
     <a href="/" class="btn">Upload another image</a>
 </div>
 
-{% for tbl in tables_data %}
+{% if error %}
+<div class="error">{{ error }}</div>
+{% endif %}
+
+{% if table_data and not table_data.valid %}
 <section class="result-section">
     <h3>
-        Table {{ loop.index }}
-        {% if tbl.valid %}
-        <span class="badge valid">Valid</span>
-        {% else %}
+        Extracted Table
         <span class="badge invalid">Validation errors</span>
-        {% endif %}
     </h3>
-
-    {% if tbl.errors %}
+    {% if table_data.errors %}
     <div class="error">
-        {% for e in tbl.errors %}
+        {% for e in table_data.errors %}
         <p>{{ e }}</p>
         {% endfor %}
     </div>
     {% endif %}
-
-    {% if tbl.rows %}
     <div class="table-container">
         <table class="extracted-table">
             <thead>
                 <tr class="header-row">
-                    {% for h in tbl.headers %}
+                    {% for h in table_data.headers %}
                     <th>{{ h }}</th>
                     {% endfor %}
                 </tr>
             </thead>
             <tbody>
-                {% for row in tbl.rows %}
+                {% for row in table_data.rows %}
                 {% if not row.is_header %}
                 <tr{% if row.row_errors %} class="error-row"{% endif %}>
                     {% for cell in row.cells %}
@@ -45,7 +42,7 @@
                 </tr>
                 {% if row.row_errors %}
                 <tr class="error-detail-row">
-                    <td colspan="{{ tbl.headers|length }}">
+                    <td colspan="{{ table_data.headers|length }}">
                         {% for e in row.row_errors %}{{ e }}{% if not loop.last %}; {% endif %}{% endfor %}
                     </td>
                 </tr>
@@ -55,13 +52,36 @@
             </tbody>
         </table>
     </div>
-    {% else %}
-    <p class="no-text">No table data extracted.</p>
-    {% endif %}
 </section>
-{% else %}
+{% endif %}
+
+{% if portfolio %}
 <section class="result-section">
-    <p class="no-text">No tables were detected in this image.</p>
+    <h3>
+        Portfolio Summary
+        <span class="badge valid">Valid</span>
+    </h3>
+    <p class="portfolio-total">Total Portfolio Value: <strong>{{ portfolio.portfolio_value }}</strong></p>
+    <div class="table-container">
+        <table class="extracted-table">
+            <thead>
+                <tr class="header-row">
+                    {% for h in portfolio.headers %}
+                    <th>{{ h }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in portfolio.rows %}
+                <tr{% if loop.last %} class="cash-row"{% endif %}>
+                    <td>{{ row[0] }}</td>
+                    <td class="num">{{ row[1] }}</td>
+                    <td class="num">{{ row[2] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </section>
-{% endfor %}
+{% endif %}
 {% endblock %}
