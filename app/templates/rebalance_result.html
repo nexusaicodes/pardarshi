@@ -1,0 +1,75 @@
+{% if result.error %}
+<div class="alert alert--error">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span>{{ result.error }}</span>
+</div>
+{% endif %}
+
+<div class="card__header">
+    <h2 class="card__title">Rebalancing Orders</h2>
+    {% if result.error %}
+    <span class="status status--error">Blocked</span>
+    {% else %}
+    <span class="status status--ok">Ready</span>
+    {% endif %}
+</div>
+
+<div class="table-wrap">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Instrument</th>
+                <th class="col-num">Current</th>
+                <th class="col-num">Target</th>
+                <th>Action</th>
+                <th class="col-num">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in result.actions %}
+            <tr class="row--action-{{ a.action|lower }}">
+                <td class="col-label">{{ a.instrument }}</td>
+                <td class="col-num">{{ a.current_value_fmt }}</td>
+                <td class="col-num">{{ a.target_value_fmt }}</td>
+                <td>
+                    <span class="action-tag action-tag--{{ a.action|lower }}">{{ a.action }}</span>
+                </td>
+                <td class="col-num">{{ a.delta_fmt }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if result.rebalanced_rows %}
+<div class="card__divider"></div>
+<div class="card__header">
+    <h2 class="card__title">After Rebalance</h2>
+</div>
+<div class="stat-row">
+    <div class="stat">
+        <span class="stat__label">Portfolio Value</span>
+        <span class="stat__value">{{ result.portfolio_value }}</span>
+    </div>
+</div>
+<div class="table-wrap">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Instrument</th>
+                <th class="col-num">Value</th>
+                <th class="col-num">Weight</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in result.rebalanced_rows %}
+            <tr{% if loop.last %} class="row--total"{% endif %}>
+                <td class="col-label">{{ row[0] }}</td>
+                <td class="col-num">{{ row[1] }}</td>
+                <td class="col-num col-pct">{{ row[2] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}

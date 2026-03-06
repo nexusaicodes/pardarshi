@@ -1,10 +1,12 @@
+import json
+
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse
 
 from app.config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, OCR_ENABLED
 from app.dependencies import get_pipeline
 from app.services.extractor import extract_tables
-from app.services.tabulator import build_table_rows, compute_portfolio
+from app.services.tabulator import build_table_rows, compute_portfolio, rebalance
 
 router = APIRouter()
 
@@ -67,9 +69,37 @@ def upload(
 
     portfolio = compute_portfolio(table_data, cash)
 
+    # Extract instrument names for the modification dropdown
+    instruments = list(portfolio["instruments_raw"].keys())
+
     return templates.TemplateResponse("result.html", {
         "request": request,
         "filename": file.filename,
         "table_data": table_data,
         "portfolio": portfolio,
+        "instruments_json": json.dumps(instruments),
+        "portfolio_json": json.dumps({
+            "portfolio_value_raw": portfolio["portfolio_value_raw"],
+            "cash_raw": portfolio["cash_raw"],
+            "instruments_raw": portfolio["instruments_raw"],
+        }),
+    })
+
+
+@router.post("/rebalance", response_class=HTMLResponse)
+def rebalance_route(request: Request, payload: str = Form(...)):
+    from app.main import templates
+
+    data = json.loads(payload)
+    portfolio = data["portfolio"]
+    targets = data["targets"]  # {instrument: pct}
+
+    # Convert pct values to int
+    targets = {k: int(v) for k, v in targets.items()}
+
+    result = rebalance(portfolio, targets)
+
+    return templates.TemplateResponse("rebalance_result.html", {
+        "request": request,
+        "result": result,
     })

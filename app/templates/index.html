@@ -2,20 +2,43 @@
 
 {% block content %}
 {% if error %}
-<div class="error">{{ error }}</div>
+<div class="alert alert--error">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span>{{ error }}</span>
+</div>
 {% endif %}
 
 <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
-    <label for="file" class="drop-zone" id="drop-zone">
-        <span class="drop-zone__prompt">Drop an image here or click to upload</span>
-        <span class="drop-zone__filename" id="filename-display"></span>
-        <input type="file" name="file" id="file" accept="image/*" required>
-    </label>
-    <div class="cash-input">
-        <label for="cash">Cash Available</label>
-        <input type="number" name="cash" id="cash" step="0.01" min="0" placeholder="0.00" required>
+    <div class="upload-grid">
+        <label for="file" class="drop-zone" id="drop-zone">
+            <div class="drop-zone__icon">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <path d="M16 4v18M9 11l7-7 7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 22v4a2 2 0 002 2h20a2 2 0 002-2v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <span class="drop-zone__prompt">Drop portfolio screenshot</span>
+            <span class="drop-zone__hint">PNG, JPG, TIFF, BMP, WebP</span>
+            <span class="drop-zone__filename" id="filename-display"></span>
+            <input type="file" name="file" id="file" accept="image/*" required>
+        </label>
+
+        <div class="cash-field">
+            <label for="cash" class="field-label">Cash Balance</label>
+            <div class="input-wrap">
+                <span class="input-prefix">INR</span>
+                <input type="number" name="cash" id="cash" step="0.01" min="0" placeholder="0.00" required>
+            </div>
+        </div>
     </div>
-    <button type="submit" id="submit-btn">Extract Tables</button>
+
+    <button type="submit" id="submit-btn" class="btn btn--primary">
+        <span class="btn__text">Analyze Portfolio</span>
+        <span class="btn__loader" style="display:none;">
+            <span class="spinner"></span>
+            Processing...
+        </span>
+    </button>
 </form>
 
 <script>
@@ -51,8 +74,9 @@ dropZone.addEventListener('drop', (e) => {
 });
 
 document.querySelector('.upload-form').addEventListener('submit', () => {
+    submitBtn.querySelector('.btn__text').style.display = 'none';
+    submitBtn.querySelector('.btn__loader').style.display = 'inline-flex';
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Processing...';
 });
 </script>
 {% endblock %}

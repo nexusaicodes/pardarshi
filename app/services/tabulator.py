@@ -90,6 +90,27 @@ def build_table_rows(table: dict) -> list[dict]:
     })
 
 
+def _fmt_indian(n: float) -> str:
+    """Format a number with Indian numeral grouping (12,34,567.89)."""
+    s = f"{n:.2f}"
+    integer_part, decimal_part = s.split(".")
+    negative = integer_part.startswith("-")
+    if negative:
+        integer_part = integer_part[1:]
+    if len(integer_part) <= 3:
+        formatted = integer_part
+    else:
+        last3 = integer_part[-3:]
+        rest = integer_part[:-3]
+        groups = []
+        while rest:
+            groups.append(rest[-2:])
+            rest = rest[:-2]
+        groups.reverse()
+        formatted = ",".join(groups) + "," + last3
+    return ("-" if negative else "") + formatted + "." + decimal_part
+
+
 EXPECTED_HEADERS = ["Instrument", "Qty.", "Avg. cost", "LTP"]
 PORTFOLIO_HEADERS = ["Instrument", "Current Value", "% of Portfolio"]
 _NUM_RE = re.compile(r"[^\d.]")
@@ -198,16 +219,106 @@ def compute_portfolio(table_data: dict, cash: float) -> dict:
         pct = round((r["current_value"] / portfolio_value) * 100, 2) if portfolio_value else 0.0
         portfolio_rows.append([
             r["instrument"],
-            f"{r['current_value']:,.2f}",
+            _fmt_indian(r["current_value"]),
             f"{pct:.2f}%",
         ])
 
     # Append cash row
     cash_pct = round((cash / portfolio_value) * 100, 2) if portfolio_value else 0.0
-    portfolio_rows.append(["Cash", f"{cash:,.2f}", f"{cash_pct:.2f}%"])
+    portfolio_rows.append(["Cash", _fmt_indian(cash), f"{cash_pct:.2f}%"])
+
+    # Raw data for rebalancing (instrument -> current_value)
+    instruments_raw = {r["instrument"]: r["current_value"] for r in rows}
 
     return {
         "headers": PORTFOLIO_HEADERS,
         "rows": portfolio_rows,
-        "portfolio_value": f"{portfolio_value:,.2f}",
+        "portfolio_value": _fmt_indian(portfolio_value),
+        "portfolio_value_raw": portfolio_value,
+        "cash_raw": cash,
+        "instruments_raw": instruments_raw,
+    }
+
+
+def rebalance(portfolio: dict, targets: dict[str, int]) -> dict:
+    """Compute rebalancing actions given target percentages.
+
+    Args:
+        portfolio: output from compute_portfolio (with raw fields)
+        targets: {instrument_name: ideal_percentage} e.g. {"ARTSON": 10, "MSPL": 5}
+
+    Returns dict with:
+        "actions": list of {instrument, current_value, target_value, delta, action}
+        "rebalanced_rows": updated portfolio rows
+        "shortfall": float (0 if sufficient cash)
+        "error": str or None
+    """
+    pv = portfolio["portfolio_value_raw"]
+    cash = portfolio["cash_raw"]
+    instruments = dict(portfolio["instruments_raw"])  # copy
+
+    # Compute deltas: target_value - current_value
+    actions = []
+    for instrument, ideal_pct in targets.items():
+        current_value = instruments.get(instrument, 0.0)
+        target_value = round(pv * ideal_pct / 100, 2)
+        delta = round(target_value - current_value, 2)
+        actions.append({
+            "instrument": instrument,
+            "current_value": current_value,
+            "current_value_fmt": _fmt_indian(current_value),
+            "target_value": target_value,
+            "target_value_fmt": _fmt_indian(target_value),
+            "delta": delta,
+            "delta_fmt": _fmt_indian(abs(delta)),
+            "action": "Sell" if delta < 0 else "Buy" if delta > 0 else "Hold",
+        })
+
+    # Order: sells first, then buys
+    sells = [a for a in actions if a["delta"] < 0]
+    buys = [a for a in actions if a["delta"] > 0]
+    holds = [a for a in actions if a["delta"] == 0]
+
+    # Simulate: apply sells first to increase cash
+    sim_cash = cash
+    for a in sells:
+        sim_cash += abs(a["delta"])
+
+    # Check if cash is sufficient for all buys
+    total_buy = sum(a["delta"] for a in buys)
+    if total_buy > sim_cash:
+        shortfall = round(total_buy - sim_cash, 2)
+        return {
+            "actions": sells + buys + holds,
+            "rebalanced_rows": None,
+            "shortfall": shortfall,
+            "error": f"Insufficient cash. Short by {_fmt_indian(shortfall)}. Reduce targets or sell more.",
+        }
+
+    # Apply changes
+    new_cash = sim_cash
+    for a in buys:
+        new_cash -= a["delta"]
+    new_cash = round(new_cash, 2)
+
+    # Update instrument values
+    for a in sells + buys:
+        instruments[a["instrument"]] = a["target_value"]
+
+    # Build rebalanced portfolio rows
+    new_pv = sum(instruments.values()) + new_cash
+    rebalanced_rows = []
+    for name, value in instruments.items():
+        pct = round((value / new_pv) * 100, 2) if new_pv else 0.0
+        rebalanced_rows.append([name, _fmt_indian(value), f"{pct:.2f}%"])
+
+    cash_pct = round((new_cash / new_pv) * 100, 2) if new_pv else 0.0
+    rebalanced_rows.append(["Cash", _fmt_indian(new_cash), f"{cash_pct:.2f}%"])
+
+    return {
+        "actions": sells + buys + holds,
+        "rebalanced_rows": rebalanced_rows,
+        "portfolio_value": _fmt_indian(new_pv),
+        "shortfall": 0,
+        "error": None,
     }

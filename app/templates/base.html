@@ -3,16 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pardarshi - Table Extraction</title>
+    <title>Pardarshi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <div class="noise"></div>
     <div class="container">
         <header>
-            <h1><a href="/">Pardarshi</a></h1>
-            <p class="subtitle">Table extraction powered by Surya</p>
+            <div class="header-row">
+                <a href="/" class="logo-link">
+                    <div class="logo-mark"></div>
+                    <h1>Pardarshi</h1>
+                </a>
+                {% block header_right %}{% endblock %}
+            </div>
+            <p class="subtitle">Portfolio Intelligence</p>
         </header>
-        {% block content %}{% endblock %}
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+        <footer>
+            <span>Made in Dubai by Nexus AI</span>
+        </footer>
     </div>
 </body>
 </html>

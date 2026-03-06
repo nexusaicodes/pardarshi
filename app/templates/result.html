@@ -1,32 +1,35 @@
 {% extends "base.html" %}
 
+{% block header_right %}
+<a href="/" class="btn btn--ghost btn--sm">New Analysis</a>
+{% endblock %}
+
 {% block content %}
-<div class="result-header">
-    <h2>Results for {{ filename }}</h2>
-    <a href="/" class="btn">Upload another image</a>
-</div>
 
 {% if error %}
-<div class="error">{{ error }}</div>
+<div class="alert alert--error">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span>{{ error }}</span>
+</div>
 {% endif %}
 
 {% if table_data and not table_data.valid %}
-<section class="result-section">
-    <h3>
-        Extracted Table
-        <span class="badge invalid">Validation errors</span>
-    </h3>
+<section class="card card--error">
+    <div class="card__header">
+        <h2 class="card__title">Extracted Data</h2>
+        <span class="status status--error">Validation Failed</span>
+    </div>
     {% if table_data.errors %}
-    <div class="error">
+    <div class="alert alert--error" style="margin-bottom:1rem;">
         {% for e in table_data.errors %}
         <p>{{ e }}</p>
         {% endfor %}
     </div>
     {% endif %}
-    <div class="table-container">
-        <table class="extracted-table">
+    <div class="table-wrap">
+        <table class="data-table">
             <thead>
-                <tr class="header-row">
+                <tr>
                     {% for h in table_data.headers %}
                     <th>{{ h }}</th>
                     {% endfor %}
@@ -35,15 +38,15 @@
             <tbody>
                 {% for row in table_data.rows %}
                 {% if not row.is_header %}
-                <tr{% if row.row_errors %} class="error-row"{% endif %}>
+                <tr{% if row.row_errors %} class="row--error"{% endif %}>
                     {% for cell in row.cells %}
                     <td>{{ cell }}</td>
                     {% endfor %}
                 </tr>
                 {% if row.row_errors %}
-                <tr class="error-detail-row">
+                <tr class="row--error-detail">
                     <td colspan="{{ table_data.headers|length }}">
-                        {% for e in row.row_errors %}{{ e }}{% if not loop.last %}; {% endif %}{% endfor %}
+                        {% for e in row.row_errors %}{{ e }}{% if not loop.last %} / {% endif %}{% endfor %}
                     </td>
                 </tr>
                 {% endif %}
@@ -56,32 +59,157 @@
 {% endif %}
 
 {% if portfolio %}
-<section class="result-section">
-    <h3>
-        Portfolio Summary
-        <span class="badge valid">Valid</span>
-    </h3>
-    <p class="portfolio-total">Total Portfolio Value: <strong>{{ portfolio.portfolio_value }}</strong></p>
-    <div class="table-container">
-        <table class="extracted-table">
+<section class="card">
+    <div class="card__header">
+        <h2 class="card__title">Portfolio</h2>
+        <span class="status status--ok">Valid</span>
+    </div>
+    <div class="stat-row">
+        <div class="stat">
+            <span class="stat__label">Total Value</span>
+            <span class="stat__value">{{ portfolio.portfolio_value }}</span>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
             <thead>
-                <tr class="header-row">
+                <tr>
                     {% for h in portfolio.headers %}
-                    <th>{{ h }}</th>
+                    <th{% if loop.index > 1 %} class="col-num"{% endif %}>{{ h }}</th>
                     {% endfor %}
                 </tr>
             </thead>
             <tbody>
                 {% for row in portfolio.rows %}
-                <tr{% if loop.last %} class="cash-row"{% endif %}>
-                    <td>{{ row[0] }}</td>
-                    <td class="num">{{ row[1] }}</td>
-                    <td class="num">{{ row[2] }}</td>
+                <tr{% if loop.last %} class="row--total"{% endif %}>
+                    <td class="col-label">{{ row[0] }}</td>
+                    <td class="col-num">{{ row[1] }}</td>
+                    <td class="col-num col-pct">{{ row[2] }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </section>
+
+<section class="card">
+    <div class="card__header">
+        <h2 class="card__title">Rebalance</h2>
+    </div>
+    <p class="card__desc">Define target allocations. Unallocated percentage remains as cash.</p>
+    <div class="table-wrap">
+        <table class="data-table" id="mod-table">
+            <thead>
+                <tr>
+                    <th>Instrument</th>
+                    <th class="col-num">Target %</th>
+                    <th class="col-action"></th>
+                </tr>
+            </thead>
+            <tbody id="mod-rows">
+            </tbody>
+        </table>
+    </div>
+    <div class="rebalance-controls">
+        <button type="button" class="btn btn--ghost btn--sm" id="add-row-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Add Instrument
+        </button>
+        <div class="rebalance-controls__right">
+            <span id="pct-total" class="pct-indicator"></span>
+            <button type="button" class="btn btn--primary btn--sm" id="rebalance-btn">Execute Rebalance</button>
+        </div>
+    </div>
+</section>
+
+<section class="card" id="rebalance-result" style="display:none;">
+</section>
+{% endif %}
+
+{% if portfolio %}
+<script>
+const instruments = {{ instruments_json | safe }};
+const portfolioData = {{ portfolio_json | safe }};
+
+function addRow(preselect, prePct) {
+    const tbody = document.getElementById('mod-rows');
+    const tr = document.createElement('tr');
+    tr.style.animation = 'fadeSlideIn 0.2s ease-out';
+
+    let options = '<option value="">Select instrument</option>';
+    instruments.forEach(name => {
+        const sel = (name === preselect) ? ' selected' : '';
+        options += '<option value="' + name + '"' + sel + '>' + name + '</option>';
+    });
+
+    tr.innerHTML =
+        '<td><select class="mod-select" name="instrument">' + options + '</select></td>' +
+        '<td class="col-num"><input type="number" class="mod-input" min="0" max="100" step="1" value="' + (prePct || '') + '" placeholder="0"></td>' +
+        '<td class="col-action"><button type="button" class="btn-icon" onclick="this.closest(\'tr\').remove(); updatePctTotal();" title="Remove"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></td>';
+    tbody.appendChild(tr);
+
+    tr.querySelector('.mod-input').addEventListener('input', updatePctTotal);
+    updatePctTotal();
+}
+
+function updatePctTotal() {
+    let total = 0;
+    document.querySelectorAll('.mod-input').forEach(input => {
+        total += parseInt(input.value) || 0;
+    });
+    const el = document.getElementById('pct-total');
+    el.textContent = total + '% allocated';
+    el.className = 'pct-indicator' + (total > 100 ? ' pct-indicator--over' : total > 0 ? ' pct-indicator--active' : '');
+}
+
+document.getElementById('add-row-btn').addEventListener('click', () => addRow());
+
+document.getElementById('rebalance-btn').addEventListener('click', () => {
+    const rows = document.querySelectorAll('#mod-rows tr');
+    const targets = {};
+    let valid = true;
+
+    rows.forEach(row => {
+        const instrument = row.querySelector('.mod-select').value;
+        const pct = parseInt(row.querySelector('.mod-input').value);
+        if (!instrument || isNaN(pct) || pct < 0) { valid = false; return; }
+        if (instrument in targets) { valid = false; alert('Duplicate: ' + instrument); return; }
+        targets[instrument] = pct;
+    });
+
+    if (!valid || Object.keys(targets).length === 0) {
+        if (Object.keys(targets).length === 0) alert('Add at least one target.');
+        return;
+    }
+    if (Object.values(targets).reduce((a, b) => a + b, 0) > 100) {
+        alert('Total exceeds 100%.'); return;
+    }
+
+    const btn = document.getElementById('rebalance-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Computing...';
+
+    const form = new FormData();
+    form.append('payload', JSON.stringify({ portfolio: portfolioData, targets }));
+
+    fetch('/rebalance', { method: 'POST', body: form })
+        .then(r => r.text())
+        .then(html => {
+            const section = document.getElementById('rebalance-result');
+            section.innerHTML = html;
+            section.style.display = 'block';
+            section.scrollIntoView({ behavior: 'smooth' });
+            btn.disabled = false;
+            btn.innerHTML = 'Execute Rebalance';
+        })
+        .catch(err => {
+            alert('Error: ' + err);
+            btn.disabled = false;
+            btn.innerHTML = 'Execute Rebalance';
+        });
+});
+
+addRow();
+</script>
 {% endif %}
 {% endblock %}
