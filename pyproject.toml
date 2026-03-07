@@ -9,11 +9,14 @@ dependencies = [
     "jinja2>=3.1",
     "python-multipart>=0.0.18",
     "pillow>=10.2",
-    "surya-ocr",
+    "surya-tabular-ocr",
 ]
 
 [tool.setuptools]
 packages = ["app"]
+
+[tool.uv.sources]
+surya-tabular-ocr = { git = "https://github.com/nexusaicodes/surya" }
 
 [project.optional-dependencies]
 dev = ["httpx"]
