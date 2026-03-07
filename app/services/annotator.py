@@ -3,6 +3,9 @@ import copy
 from io import BytesIO
 
 from PIL import Image
+
+Image.MAX_IMAGE_PIXELS = 10_000_000  # ~10 megapixels; prevents decompression bombs
+
 from surya.debug.draw import draw_bboxes_on_image
 
 

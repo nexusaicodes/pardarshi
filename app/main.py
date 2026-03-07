@@ -5,7 +5,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from app.dependencies import limiter
 from app.routers import ui, api
 
 APP_DIR = Path(__file__).resolve().parent
@@ -21,6 +24,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Pardarshi", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 
 templates = Jinja2Templates(directory=APP_DIR / "templates")

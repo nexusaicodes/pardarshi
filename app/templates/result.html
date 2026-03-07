@@ -128,27 +128,59 @@
 
 {% if portfolio %}
 <script>
-const instruments = {{ instruments_json | safe }};
-const portfolioData = {{ portfolio_json | safe }};
+const instruments = {{ instruments | tojson }};
+const portfolioData = {{ portfolio_raw | tojson }};
 
 function addRow(preselect, prePct) {
     const tbody = document.getElementById('mod-rows');
     const tr = document.createElement('tr');
     tr.style.animation = 'fadeSlideIn 0.2s ease-out';
 
-    let options = '<option value="">Select instrument</option>';
+    const td1 = document.createElement('td');
+    const select = document.createElement('select');
+    select.className = 'mod-select';
+    select.name = 'instrument';
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = 'Select instrument';
+    select.appendChild(defaultOpt);
     instruments.forEach(name => {
-        const sel = (name === preselect) ? ' selected' : '';
-        options += '<option value="' + name + '"' + sel + '>' + name + '</option>';
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        if (name === preselect) opt.selected = true;
+        select.appendChild(opt);
     });
+    td1.appendChild(select);
 
-    tr.innerHTML =
-        '<td><select class="mod-select" name="instrument">' + options + '</select></td>' +
-        '<td class="col-num"><input type="number" class="mod-input" min="0" max="100" step="1" value="' + (prePct || '') + '" placeholder="0"></td>' +
-        '<td class="col-action"><button type="button" class="btn-icon" onclick="this.closest(\'tr\').remove(); updatePctTotal();" title="Remove"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></td>';
+    const td2 = document.createElement('td');
+    td2.className = 'col-num';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'mod-input';
+    input.min = '0';
+    input.max = '100';
+    input.step = '1';
+    input.value = prePct || '';
+    input.placeholder = '0';
+    td2.appendChild(input);
+
+    const td3 = document.createElement('td');
+    td3.className = 'col-action';
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-icon';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+    removeBtn.addEventListener('click', function() { tr.remove(); updatePctTotal(); });
+    td3.appendChild(removeBtn);
+
+    tr.appendChild(td1);
+    tr.appendChild(td2);
+    tr.appendChild(td3);
     tbody.appendChild(tr);
 
-    tr.querySelector('.mod-input').addEventListener('input', updatePctTotal);
+    input.addEventListener('input', updatePctTotal);
     updatePctTotal();
 }
 
@@ -196,6 +228,7 @@ document.getElementById('rebalance-btn').addEventListener('click', () => {
         .then(r => r.text())
         .then(html => {
             const section = document.getElementById('rebalance-result');
+            // Trust assumption: HTML is from our own /rebalance endpoint with Jinja2 auto-escaping
             section.innerHTML = html;
             section.style.display = 'block';
             section.scrollIntoView({ behavior: 'smooth' });

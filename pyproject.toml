@@ -10,6 +10,7 @@ dependencies = [
     "python-multipart>=0.0.18",
     "pillow>=10.2",
     "surya-tabular-ocr",
+    "slowapi>=0.1.9",
 ]
 
 [tool.setuptools]
@@ -19,4 +20,4 @@ packages = ["app"]
 surya-tabular-ocr = { git = "https://github.com/nexusaicodes/surya" }
 
 [project.optional-dependencies]
-dev = ["httpx"]
+dev = ["httpx", "pytest"]
