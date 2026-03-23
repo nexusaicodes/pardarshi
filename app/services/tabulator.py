@@ -68,9 +68,9 @@ def build_table_rows(table: dict) -> list[dict]:
     # Gather all col_ids and row_ids
     col_ids = sorted({c["col_id"] for c in cells})
     row_ids = sorted({c["row_id"] for c in cells})
-    header_rows = {c["row_id"] for c in cells if c.get("is_header")}
 
-    rows = []
+    # Build cell values for each row
+    all_rows = []
     for rid in row_ids:
         cell_values = []
         for cid in col_ids:
@@ -78,11 +78,30 @@ def build_table_rows(table: dict) -> list[dict]:
             # Sort by x position, then join
             texts.sort(key=lambda t: t[0])
             cell_values.append(" ".join(t[1] for t in texts))
-        rows.append({
-            "row_id": rid,
-            "is_header": rid in header_rows,
-            "cells": cell_values,
-        })
+        all_rows.append({"row_id": rid, "cells": cell_values})
+
+    # Detect the header row by finding the row whose cells best match
+    # known header patterns, rather than trusting surya's is_header flag
+    # (surya sometimes marks ALL cells as is_header=True).
+    header_rid = None
+    best_score = 0
+    for row in all_rows:
+        score = sum(
+            1 for cell in row["cells"]
+            if any(
+                p in cell.strip().lower()
+                for patterns in _HEADER_PATTERNS.values()
+                for p in patterns
+            )
+        )
+        if score > best_score:
+            best_score = score
+            header_rid = row["row_id"]
+
+    rows = []
+    for row in all_rows:
+        row["is_header"] = row["row_id"] == header_rid
+        rows.append(row)
 
     return validate_table({
         "col_ids": col_ids,
