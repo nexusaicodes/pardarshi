@@ -14,11 +14,11 @@
     <div class="container">
         <header>
             <div class="header-row">
+                {% block header_right %}{% endblock %}
                 <a href="/" class="logo-link">
                     <div class="logo-mark"></div>
                     <h1>Pardarshi</h1>
                 </a>
-                {% block header_right %}{% endblock %}
             </div>
             <p class="subtitle">Portfolio Intelligence</p>
         </header>

@@ -1,6 +1,11 @@
 import pytest
 
-from app.services.tabulator import _fmt_indian, compute_portfolio, rebalance
+from app.services.tabulator import (
+    _fmt_indian,
+    compute_portfolio,
+    rebalance,
+    validate_table,
+)
 
 
 # ── _fmt_indian ──────────────────────────────────────────────────────
@@ -25,46 +30,114 @@ class TestFmtIndian:
         assert _fmt_indian(-50000.00) == "-50,000.00"
 
 
+# ── validate_table ──────────────────────────────────────────────────
+
+class TestValidateTable:
+    def test_qty_ltp_mode(self):
+        td = validate_table({
+            "col_ids": [0, 1, 2, 3],
+            "rows": [
+                {"is_header": True, "cells": ["Instrument", "Qty.", "Avg. cost", "LTP"]},
+                {"is_header": False, "cells": ["AAA", "100", "10.00", "12.00"]},
+            ],
+        })
+        assert td["valid"]
+        assert td["mode"] == "qty_ltp"
+
+    def test_present_value_mode(self):
+        td = validate_table({
+            "col_ids": [0, 1, 2, 3, 4, 5],
+            "rows": [
+                {"is_header": True, "cells": ["Symbol", "Qty.", "Buy avg.", "Buy value", "LTP", "Present value"]},
+                {"is_header": False, "cells": ["AAA", "100", "10.00", "1000.00", "12.00", "1200.00"]},
+            ],
+        })
+        assert td["valid"]
+        assert td["mode"] == "present_value"
+
+    def test_missing_columns_invalid(self):
+        td = validate_table({
+            "col_ids": [0, 1],
+            "rows": [
+                {"is_header": True, "cells": ["Foo", "Bar"]},
+                {"is_header": False, "cells": ["x", "y"]},
+            ],
+        })
+        assert not td["valid"]
+        assert td["mode"] is None
+
+    def test_extra_columns_ignored(self):
+        td = validate_table({
+            "col_ids": [0, 1, 2, 3, 4, 5],
+            "rows": [
+                {"is_header": True, "cells": ["Symbol", "Qty.", "Buy avg.", "Buy value", "LTP", "Present value"]},
+                {"is_header": False, "cells": ["GGBL-SM", "600", "264.10", "1,58,460.00", "283.20", "1,69,920.00"]},
+            ],
+        })
+        assert td["valid"]
+        assert td["col_map"]["name"] == 0
+        assert td["col_map"]["present_value"] == 5
+
+
 # ── compute_portfolio ────────────────────────────────────────────────
 
 @pytest.fixture
-def table_data():
-    return {
+def table_data_qty_ltp():
+    return validate_table({
+        "col_ids": [0, 1, 2, 3],
         "rows": [
             {"is_header": True, "cells": ["Instrument", "Qty.", "Avg. cost", "LTP"]},
             {"is_header": False, "cells": ["AAA", "100", "10.00", "12.00"]},
             {"is_header": False, "cells": ["BBB", "200", "5.00", "6.00"]},
         ],
-    }
+    })
+
+
+@pytest.fixture
+def table_data_pv():
+    return validate_table({
+        "col_ids": [0, 1, 2, 3, 4, 5],
+        "rows": [
+            {"is_header": True, "cells": ["Symbol", "Qty.", "Buy avg.", "Buy value", "LTP", "Present value"]},
+            {"is_header": False, "cells": ["AAA", "100", "10.00", "1000.00", "12.00", "1200.00"]},
+            {"is_header": False, "cells": ["BBB", "200", "5.00", "1000.00", "6.00", "1200.00"]},
+        ],
+    })
 
 
 class TestComputePortfolio:
-    def test_values_correct(self, table_data):
-        p = compute_portfolio(table_data, 1000.0)
+    def test_values_correct_qty_ltp(self, table_data_qty_ltp):
+        p = compute_portfolio(table_data_qty_ltp, 1000.0)
         raw = p["instruments_raw"]
         assert raw["AAA"] == 1200.0
         assert raw["BBB"] == 1200.0
 
-    def test_portfolio_value(self, table_data):
-        p = compute_portfolio(table_data, 1000.0)
+    def test_values_correct_present_value(self, table_data_pv):
+        p = compute_portfolio(table_data_pv, 1000.0)
+        raw = p["instruments_raw"]
+        assert raw["AAA"] == 1200.0
+        assert raw["BBB"] == 1200.0
+
+    def test_portfolio_value(self, table_data_qty_ltp):
+        p = compute_portfolio(table_data_qty_ltp, 1000.0)
         assert p["portfolio_value_raw"] == 3400.0
 
-    def test_percentages_sum_to_100(self, table_data):
-        p = compute_portfolio(table_data, 1000.0)
+    def test_percentages_sum_to_100(self, table_data_qty_ltp):
+        p = compute_portfolio(table_data_qty_ltp, 1000.0)
         total_pct = sum(
             float(row[2].rstrip("%")) for row in p["rows"]
         )
         assert abs(total_pct - 100.0) < 0.1
 
-    def test_raw_fields_present(self, table_data):
-        p = compute_portfolio(table_data, 1000.0)
+    def test_raw_fields_present(self, table_data_qty_ltp):
+        p = compute_portfolio(table_data_qty_ltp, 1000.0)
         assert "portfolio_value_raw" in p
         assert "cash_raw" in p
         assert "instruments_raw" in p
         assert p["cash_raw"] == 1000.0
 
-    def test_cash_row_appended(self, table_data):
-        p = compute_portfolio(table_data, 1000.0)
+    def test_cash_row_appended(self, table_data_qty_ltp):
+        p = compute_portfolio(table_data_qty_ltp, 1000.0)
         last_row = p["rows"][-1]
         assert last_row[0] == "Cash"
         assert last_row[1] == _fmt_indian(1000.0)

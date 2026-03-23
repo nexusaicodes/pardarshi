@@ -111,9 +111,16 @@ def _fmt_indian(n: float) -> str:
     return ("-" if negative else "") + formatted + "." + decimal_part
 
 
-EXPECTED_HEADERS = ["Instrument", "Qty.", "Avg. cost", "LTP"]
 PORTFOLIO_HEADERS = ["Instrument", "Current Value", "% of Portfolio"]
 _NUM_RE = re.compile(r"[^\d.]")
+
+# Patterns for detecting columns by header text (case-insensitive substring match)
+_HEADER_PATTERNS = {
+    "name": ["symbol", "instrument", "stock", "scrip"],
+    "qty": ["qty", "quantity"],
+    "ltp": ["ltp", "last traded", "last price", "current price"],
+    "present_value": ["present value", "current value", "market value", "mkt value"],
+}
 
 
 def _parse_number(text: str) -> str:
@@ -126,65 +133,112 @@ def _parse_number(text: str) -> str:
     return cleaned
 
 
+def _detect_columns(header_cells: list[str]) -> dict[str, int]:
+    """Map logical column names to indices by matching header text."""
+    cols = {}
+    for i, cell in enumerate(header_cells):
+        text = cell.strip().lower()
+        for key, patterns in _HEADER_PATTERNS.items():
+            if any(p in text for p in patterns):
+                cols[key] = i
+                break
+    return cols
+
+
 def validate_table(table_data: dict) -> dict:
-    """Validate and normalize table to expected 4-column schema.
+    """Validate table with flexible column detection.
 
-    Expected: Instrument (text) | Qty. (number) | Avg. cost (decimal) | LTP (decimal)
+    Supported modes (detected from headers):
+      Mode A: name + qty + ltp  → current_value = qty * ltp
+      Mode B: name + present_value → current_value used directly
 
-    Returns the table_data with added "errors" list and "valid" bool.
-    Rows that don't conform are flagged but kept.
+    Extra columns (Buy avg., Buy value, etc.) are ignored.
+    Returns the table_data with added "errors", "valid", "mode", "col_map".
     """
     errors = []
     rows = table_data.get("rows", [])
 
-    # Check column count
-    if table_data["col_ids"] and len(table_data["col_ids"]) != 4:
-        errors.append(f"Expected 4 columns, got {len(table_data['col_ids'])}")
+    # Find header row and detect columns
+    header_row = next((r for r in rows if r["is_header"]), None)
+    col_map = _detect_columns(header_row["cells"]) if header_row else {}
+
+    # Determine mode
+    has_name = "name" in col_map
+    has_qty_ltp = "qty" in col_map and "ltp" in col_map
+    has_pv = "present_value" in col_map
+
+    if has_name and has_pv:
+        mode = "present_value"
+    elif has_name and has_qty_ltp:
+        mode = "qty_ltp"
+    else:
+        missing = []
+        if not has_name:
+            missing.append("Symbol/Instrument")
+        if not has_pv and not has_qty_ltp:
+            missing.append("(Qty + LTP) or Present Value")
+        errors.append(f"Could not detect required columns. Missing: {', '.join(missing)}")
+        mode = None
+
+    num_cols = len(table_data["col_ids"]) if table_data["col_ids"] else 0
 
     validated_rows = []
     for row in rows:
         cells = row["cells"]
 
-        # Skip header rows from validation but normalize their text
         if row["is_header"]:
             validated_rows.append(row)
             continue
 
-        # Must have exactly 4 cells
-        if len(cells) != 4:
-            row["row_errors"] = [f"Expected 4 cells, got {len(cells)}"]
+        if len(cells) != num_cols:
+            row["row_errors"] = [f"Expected {num_cols} cells, got {len(cells)}"]
+            validated_rows.append(row)
+            continue
+
+        if mode is None:
             validated_rows.append(row)
             continue
 
         row_errors = []
-
-        # Col 0: Instrument — should be non-empty text
-        instrument = cells[0].strip()
+        name_idx = col_map["name"]
+        instrument = cells[name_idx].strip()
         if not instrument:
-            row_errors.append("Instrument is empty")
-        cells[0] = instrument
+            row_errors.append("Instrument/Symbol is empty")
 
-        # Cols 1-3: numeric values
-        for i, col_name in enumerate(["Qty.", "Avg. cost", "LTP"], start=1):
-            raw = cells[i].strip()
+        if mode == "qty_ltp":
+            for key, label in [("qty", "Qty."), ("ltp", "LTP")]:
+                idx = col_map[key]
+                raw = cells[idx].strip()
+                parsed = _parse_number(raw)
+                if not parsed:
+                    row_errors.append(f"{label}: '{raw}' is not a valid number")
+                else:
+                    cells[idx] = parsed
+        else:  # present_value
+            idx = col_map["present_value"]
+            raw = cells[idx].strip()
             parsed = _parse_number(raw)
             if not parsed:
-                row_errors.append(f"{col_name}: '{raw}' is not a valid number")
+                row_errors.append(f"Present Value: '{raw}' is not a valid number")
             else:
-                try:
-                    cells[i] = parsed
-                except ValueError:
-                    row_errors.append(f"{col_name}: '{raw}' could not be parsed")
+                cells[idx] = parsed
 
         row["cells"] = cells
         if row_errors:
             row["row_errors"] = row_errors
         validated_rows.append(row)
 
+    # Build display headers from original header row
+    if header_row:
+        table_data["headers"] = header_row["cells"]
+    else:
+        table_data["headers"] = [f"Col {i}" for i in range(num_cols)]
+
     table_data["rows"] = validated_rows
-    table_data["headers"] = EXPECTED_HEADERS
+    table_data["mode"] = mode
+    table_data["col_map"] = col_map
     table_data["errors"] = errors
-    table_data["valid"] = len(errors) == 0 and all(
+    table_data["valid"] = mode is not None and len(errors) == 0 and all(
         "row_errors" not in r for r in validated_rows if not r["is_header"]
     )
     return table_data
@@ -193,21 +247,27 @@ def validate_table(table_data: dict) -> dict:
 def compute_portfolio(table_data: dict, cash: float) -> dict:
     """Compute portfolio summary from a validated table and cash amount.
 
-    For each instrument: current_value = Qty * LTP
-    portfolio_value = sum(current_values) + cash
-    Each row gets a % of portfolio_value.
+    Mode qty_ltp:      current_value = qty * ltp
+    Mode present_value: current_value read directly
     """
     rows = []
     total_instrument_value = 0.0
+    mode = table_data["mode"]
+    col_map = table_data["col_map"]
 
     for row in table_data["rows"]:
         if row["is_header"]:
             continue
         cells = row["cells"]
-        instrument = cells[0]
-        qty = float(cells[1])
-        ltp = float(cells[3])
-        current_value = round(qty * ltp, 2)
+        instrument = cells[col_map["name"]]
+
+        if mode == "qty_ltp":
+            qty = float(cells[col_map["qty"]])
+            ltp = float(cells[col_map["ltp"]])
+            current_value = round(qty * ltp, 2)
+        else:  # present_value
+            current_value = round(float(cells[col_map["present_value"]]), 2)
+
         total_instrument_value += current_value
         rows.append({"instrument": instrument, "current_value": current_value})
 

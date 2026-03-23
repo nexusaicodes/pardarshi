@@ -22,9 +22,11 @@ Pardarshi is a FastAPI web app that extracts stock portfolio tables from screens
 
 - The surya `TableExtractionPipeline` is loaded once at startup via FastAPI lifespan and stored on `app.state.pipeline`
 - It is injected into routes via `Depends(get_pipeline)` from `app/dependencies.py`
-- Table extraction expects a 4-column schema: **Instrument, Qty., Avg. cost, LTP**
+- Table extraction uses flexible column detection from header names (case-insensitive substring match)
+- Two modes: **qty_ltp** (Symbol + Qty + LTP → compute value) or **present_value** (Symbol + Present Value → use directly)
+- Extra columns (Buy avg., Buy value, etc.) are ignored
 - Validation in `tabulator.py` strips HTML tags, parses numbers, and flags bad rows
-- Portfolio math: `current_value = qty * ltp`, percentage of `(sum(values) + cash)`
+- Portfolio math: `current_value = qty * ltp` or direct from Present Value, percentage of `(sum(values) + cash)`
 - Rebalancing: computes buy/sell deltas from target percentages, checks cash sufficiency
 
 ## File Layout
