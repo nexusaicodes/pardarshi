@@ -1,0 +1,19 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.E2E_HOST }}
+          username: ${{ secrets.E2E_USER }}
+          key: ${{ secrets.E2E_SSH_KEY }}
+          script: |
+            cd /opt/pardarshi
+            git pull origin main
+            docker compose up -d --build --force-recreate
