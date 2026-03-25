@@ -6,9 +6,9 @@ Pardarshi is a FastAPI web app that extracts stock portfolio tables from screens
 
 ## Tech Stack
 
-- **Python 3.10+**, managed with **uv**
+- **Python 3.11+**, managed with **uv**
 - **FastAPI** with Jinja2 templates (server-rendered HTML)
-- **surya** (`surya-tabular-ocr` package from `nexusaicodes/surya` fork) for table extraction OCR
+- **surya** (`surya-tabular-ocr` package from PyPI, v0.1.1+) for table extraction OCR
 - **Pillow** for image handling
 - **pytest** for tests, **httpx** as test client (dev dependency)
 

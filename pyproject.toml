@@ -2,22 +2,19 @@
 name = "pardarshi"
 version = "0.1.0"
 description = "Web UI and API for surya table extraction"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
     "jinja2>=3.1",
     "python-multipart>=0.0.18",
     "pillow>=10.2",
-    "surya-tabular-ocr",
+    "surya-tabular-ocr>=0.1.1",
     "slowapi>=0.1.9",
 ]
 
 [tool.setuptools]
 packages = ["app"]
-
-[tool.uv.sources]
-surya-tabular-ocr = { git = "https://github.com/nexusaicodes/surya" }
 
 [project.optional-dependencies]
 dev = ["httpx", "pytest"]
